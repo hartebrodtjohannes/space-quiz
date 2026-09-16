@@ -226,14 +226,44 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
       margin-bottom: 12px;
       color: var(--muted);
       font-size: 14px;
       font-weight: 700;
     }
 
+    .status-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+    }
+
     .score {
       color: var(--accent);
+    }
+
+    .timer-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .timer-toggle input {
+      inline-size: 1rem;
+      block-size: 1rem;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .timer-value {
+      min-width: 54px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
 
     .progress-track {
@@ -422,6 +452,12 @@
       color: var(--muted);
     }
 
+    .result-timer {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
     .quiz.hidden {
       display: none;
     }
@@ -540,7 +576,14 @@
       <div class="quiz" id="quiz">
         <div class="topline">
           <span id="question-count">Question 1 of 10</span>
-          <span class="score" id="score">Score: 0</span>
+          <span class="status-group">
+            <label class="timer-toggle" for="timer-enabled">
+              <input id="timer-enabled" type="checkbox">
+              Timed
+            </label>
+            <span class="timer-value" id="timer-display" aria-live="polite">--:--</span>
+            <span class="score" id="score">Score: 0</span>
+          </span>
         </div>
         <div class="progress-track" role="progressbar" aria-label="Quiz progress" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1">
           <div class="progress-bar" id="progress-bar"></div>
@@ -560,12 +603,14 @@
         <span class="result-emoji" id="result-emoji" aria-hidden="true">🌟</span>
         <h2 id="result-title">Stellar work!</h2>
         <div class="result-score" id="result-score">10 / 10</div>
+        <p class="result-timer" id="result-timer" hidden>Timed run: 00:00</p>
         <p class="result-copy" id="result-copy"></p>
         <button class="restart-button" id="restart-button" type="button">Play again 🚀</button>
       </div>
     </section>
   </main>
 
+  <script src="quiz-timer.js"></script>
   <script>
     const questions = [
       {
@@ -644,10 +689,20 @@
     const feedbackMessage = document.getElementById("feedback-message");
     const nextButton = document.getElementById("next-button");
     const restartButton = document.getElementById("restart-button");
+    const timerEnabled = document.getElementById("timer-enabled");
+    const timerDisplay = document.getElementById("timer-display");
+    const resultTimer = document.getElementById("result-timer");
 
     let currentQuestion = 0;
     let score = 0;
     let answered = false;
+    let quizFinished = false;
+
+    const timer = QuizTimer.createQuizTimer(updateTimerDisplay);
+
+    function updateTimerDisplay(elapsedSeconds) {
+      timerDisplay.textContent = timer.isEnabled() ? QuizTimer.formatElapsedTime(elapsedSeconds) : "--:--";
+    }
 
     function renderQuestion() {
       const item = questions[currentQuestion];
@@ -717,6 +772,8 @@
     }
 
     function showResults() {
+      quizFinished = true;
+      timer.stop();
       quiz.classList.add("hidden");
       results.classList.add("visible");
 
@@ -726,6 +783,12 @@
       const copy = document.getElementById("result-copy");
 
       document.getElementById("result-score").textContent = `${score} / ${questions.length}`;
+      if (timer.isEnabled()) {
+        resultTimer.hidden = false;
+        resultTimer.textContent = `Timed run: ${QuizTimer.formatElapsedTime(timer.getElapsedSeconds())}`;
+      } else {
+        resultTimer.hidden = true;
+      }
 
       if (percentage >= 0.9) {
         emoji.textContent = "🏆";
@@ -769,13 +832,29 @@
     function restartQuiz() {
       currentQuestion = 0;
       score = 0;
+      quizFinished = false;
+      timer.reset();
+      if (timer.isEnabled()) {
+        timer.start();
+      }
       results.classList.remove("visible");
       quiz.classList.remove("hidden");
       renderQuestion();
     }
 
+    timerEnabled.addEventListener("change", () => {
+      timer.setEnabled(timerEnabled.checked);
+      if (timer.isEnabled() && !quizFinished) {
+        timer.start();
+      } else {
+        timer.stop();
+      }
+      resultTimer.hidden = true;
+    });
+
     nextButton.addEventListener("click", nextQuestion);
     restartButton.addEventListener("click", restartQuiz);
+    updateTimerDisplay(0);
     renderQuestion();
   </script>
 </body>
