@@ -15,6 +15,7 @@
       --border: rgba(69, 83, 129, 0.15);
       --accent: #6855e8;
       --accent-2: #28a9db;
+      --accent-red: #ff5f78;
       --correct: #14945d;
       --correct-bg: #e1f8ed;
       --wrong: #d8435c;
@@ -34,6 +35,7 @@
         --border: rgba(194, 204, 255, 0.14);
         --accent: #9688ff;
         --accent-2: #4cc7ef;
+        --accent-red: #ff8ea1;
         --correct: #57d69a;
         --correct-bg: #163b32;
         --wrong: #ff7189;
@@ -59,6 +61,7 @@
       background:
         radial-gradient(circle at 15% 12%, rgba(104, 85, 232, 0.2), transparent 30%),
         radial-gradient(circle at 88% 82%, rgba(40, 169, 219, 0.18), transparent 28%),
+        radial-gradient(circle at 64% 24%, color-mix(in srgb, var(--accent-red) 22%, transparent), transparent 34%),
         var(--bg);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-size: 15px;
@@ -127,7 +130,7 @@
       border: 1px solid color-mix(in srgb, var(--accent-2) 38%, var(--border));
       border-radius: 15px;
       background:
-        linear-gradient(90deg, color-mix(in srgb, var(--accent-2) 8%, transparent), transparent 45%),
+        linear-gradient(90deg, color-mix(in srgb, var(--accent-2) 8%, transparent), color-mix(in srgb, var(--accent-red) 8%, transparent) 72%, transparent),
         var(--surface);
       box-shadow:
         inset 0 0 24px color-mix(in srgb, var(--accent-2) 7%, transparent),
@@ -226,14 +229,44 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
       margin-bottom: 12px;
       color: var(--muted);
       font-size: 14px;
       font-weight: 700;
     }
 
+    .status-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+    }
+
     .score {
       color: var(--accent);
+    }
+
+    .timer-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .timer-toggle input {
+      inline-size: 1rem;
+      block-size: 1rem;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .timer-value {
+      min-width: 54px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
 
     .progress-track {
@@ -248,7 +281,7 @@
       width: 10%;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      background: linear-gradient(90deg, var(--accent), var(--accent-2) 58%, var(--accent-red));
       transition: width 450ms cubic-bezier(0.22, 1, 0.36, 1);
     }
 
@@ -366,8 +399,8 @@
       border: 0;
       border-radius: 13px;
       color: #fff;
-      background: linear-gradient(135deg, var(--accent), #7d64ef);
-      box-shadow: 0 8px 18px rgba(104, 85, 232, 0.24);
+      background: linear-gradient(135deg, var(--accent), #7d64ef 62%, var(--accent-red));
+      box-shadow: 0 8px 18px color-mix(in srgb, var(--accent-red) 24%, rgba(104, 85, 232, 0.24));
       font: inherit;
       font-weight: 800;
       cursor: pointer;
@@ -386,7 +419,7 @@
     .next-button:hover,
     .restart-button:hover {
       transform: translateY(-2px);
-      box-shadow: 0 11px 22px rgba(104, 85, 232, 0.32);
+      box-shadow: 0 11px 22px color-mix(in srgb, var(--accent-red) 28%, rgba(104, 85, 232, 0.32));
     }
 
     .results {
@@ -420,6 +453,12 @@
       max-width: 390px;
       margin: 0 auto;
       color: var(--muted);
+    }
+
+    .result-timer {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-weight: 700;
     }
 
     .quiz.hidden {
@@ -540,7 +579,14 @@
       <div class="quiz" id="quiz">
         <div class="topline">
           <span id="question-count">Question 1 of 10</span>
-          <span class="score" id="score">Score: 0</span>
+          <span class="status-group">
+            <label class="timer-toggle" for="timer-enabled">
+              <input id="timer-enabled" type="checkbox">
+              Timed
+            </label>
+            <span class="timer-value" id="timer-display" aria-live="polite">--:--</span>
+            <span class="score" id="score">Score: 0</span>
+          </span>
         </div>
         <div class="progress-track" role="progressbar" aria-label="Quiz progress" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1">
           <div class="progress-bar" id="progress-bar"></div>
@@ -560,12 +606,14 @@
         <span class="result-emoji" id="result-emoji" aria-hidden="true">🌟</span>
         <h2 id="result-title">Stellar work!</h2>
         <div class="result-score" id="result-score">10 / 10</div>
+        <p class="result-timer" id="result-timer" hidden>Timed run: 00:00</p>
         <p class="result-copy" id="result-copy"></p>
         <button class="restart-button" id="restart-button" type="button">Play again 🚀</button>
       </div>
     </section>
   </main>
 
+  <script src="quiz-timer.js"></script>
   <script>
     const questions = [
       {
@@ -644,10 +692,20 @@
     const feedbackMessage = document.getElementById("feedback-message");
     const nextButton = document.getElementById("next-button");
     const restartButton = document.getElementById("restart-button");
+    const timerEnabled = document.getElementById("timer-enabled");
+    const timerDisplay = document.getElementById("timer-display");
+    const resultTimer = document.getElementById("result-timer");
 
     let currentQuestion = 0;
     let score = 0;
     let answered = false;
+    let quizFinished = false;
+
+    const timer = QuizTimer.createQuizTimer(updateTimerDisplay);
+
+    function updateTimerDisplay(elapsedSeconds) {
+      timerDisplay.textContent = timer.isEnabled() ? QuizTimer.formatElapsedTime(elapsedSeconds) : "--:--";
+    }
 
     function renderQuestion() {
       const item = questions[currentQuestion];
@@ -717,6 +775,8 @@
     }
 
     function showResults() {
+      quizFinished = true;
+      timer.stop();
       quiz.classList.add("hidden");
       results.classList.add("visible");
 
@@ -726,6 +786,12 @@
       const copy = document.getElementById("result-copy");
 
       document.getElementById("result-score").textContent = `${score} / ${questions.length}`;
+      if (timer.isEnabled()) {
+        resultTimer.hidden = false;
+        resultTimer.textContent = `Timed run: ${QuizTimer.formatElapsedTime(timer.getElapsedSeconds())}`;
+      } else {
+        resultTimer.hidden = true;
+      }
 
       if (percentage >= 0.9) {
         emoji.textContent = "🏆";
@@ -749,7 +815,7 @@
     }
 
     function launchConfetti(amount) {
-      const colors = ["#6855e8", "#28a9db", "#ffd45c", "#ff7189", "#57d69a"];
+      const colors = ["#6855e8", "#28a9db", "#ffd45c", "#ff7189", "#ff4f6f", "#ff9aac", "#57d69a"];
       const card = document.querySelector(".card");
 
       for (let index = 0; index < amount; index += 1) {
@@ -769,13 +835,29 @@
     function restartQuiz() {
       currentQuestion = 0;
       score = 0;
+      quizFinished = false;
+      timer.reset();
+      if (timer.isEnabled()) {
+        timer.start();
+      }
       results.classList.remove("visible");
       quiz.classList.remove("hidden");
       renderQuestion();
     }
 
+    timerEnabled.addEventListener("change", () => {
+      timer.setEnabled(timerEnabled.checked);
+      if (timer.isEnabled() && !quizFinished) {
+        timer.start();
+      } else {
+        timer.stop();
+      }
+      resultTimer.hidden = true;
+    });
+
     nextButton.addEventListener("click", nextQuestion);
     restartButton.addEventListener("click", restartQuiz);
+    updateTimerDisplay(0);
     renderQuestion();
   </script>
 </body>
